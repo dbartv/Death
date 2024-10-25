@@ -105,8 +105,8 @@ Function Compare-SortColumns ($SortColumns, $OtherIndex){
 #Function to generate TSQL code 
 #==================================================================================================
 Function New-TsqlStatementNarrow ($Result, $CreateScripts, $DropScripts, $Filter,$OtherIndex){
-  $DropScript = ($Result.'Drop_TSQL'.Substring(2)) #Remove the comment '--' from the drop script
-  $CreateScript = ('/*' +  ($Result.'Create_TSQL'.Substring(2)) + '*/') #Surround the create statement with a 'Block comment'
+  $DropScript = ($Result.'Drop_Tsql'.Substring(2)) #Remove the comment '--' from the drop script
+  $CreateScript = ('/*' +  ($Result.'Create_Tsql'.Substring(2)) + '*/') #Surround the create statement with a 'Block comment'
   $CreateScript = $CreateScript.Replace("ONLINE=?, SORT_IN_TEMPDB=?, DATA_COMPRESSION=?);*/","ONLINE=OFF, MAXDOP=0);*/") #change the create script options
   $OtherIndexName = $OtherIndex.index_name
   [Void]$CreateScripts.Add("$CreateScript")
@@ -118,8 +118,8 @@ Function New-TsqlStatementNarrow ($Result, $CreateScripts, $DropScripts, $Filter
 #Function to generate TSQL code 
 #==================================================================================================
 Function New-TsqlStatement ($Result, $CreateScripts, $DropScripts, $Filter){
-  $DropScript = ($Result.'Drop_TSQL'.Substring(2)) #Remove the comment '--' from the drop script
-  $CreateScript = ('/*' +  ($Result.'Create_TSQL'.Substring(2)) + '*/') #Surround the create statement with a 'Block comment'
+  $DropScript = ($Result.'Drop_Tsql'.Substring(2)) #Remove the comment '--' from the drop script
+  $CreateScript = ('/*' +  ($Result.'Create_Tsql'.Substring(2)) + '*/') #Surround the create statement with a 'Block comment'
   $CreateScript = $CreateScript.Replace("ONLINE=?, SORT_IN_TEMPDB=?, DATA_COMPRESSION=?);*/","ONLINE=OFF, MAXDOP=0);*/") #change the create script options
   [Void]$CreateScripts.Add("$CreateScript")
   [Void]$DropScripts.Add("$DropScript")
@@ -261,11 +261,11 @@ catch{
 #==================================================================================================
 #Execute sp_blitzindex and write output to $OutputDatbaseName
 #==================================================================================================
-$Query = "$Sp_BlitzIndex @DatabaseName = '$DbName', @Mode = 2, @outputDatabaseName = '$OutputDatbaseName',
+$Query = "$Sp_BlitzIndex @DatabaseName = '$DbName', @Mode = 2, @OutputDatabaseName = '$OutputDatbaseName',
            @OutputTableName = '$OutputTableName', @OutputSchemaName = '$OutputSchemaName'"
 
 try {
-  Invoke-Sqlcmd -ServerInstance $Server -Database master -Query $Query -ErrorAction Stop
+  Invoke-Sqlcmd -ServerInstance $Server -Database master -Query $Query -ErrorAction Stop -ApplicationIntent ReadOnly
 }
 catch {
   Throw
@@ -379,8 +379,8 @@ WITH cte
                          t1.[key_column_names_with_sort_order],
                          t1.[schema_name],
                          t1.[table_name],
-                         t1.[drop_tsql],
-                         t1.[create_tsql],
+                         t1.[Drop_Tsql],
+                         t1.[Create_Tsql],
                          t1.[include_column_names],
                          t1.[filter_definition],
                          t1.[is_unique_constraint],
@@ -409,8 +409,8 @@ SELECT [id],
        [key_column_names_with_sort_order],
        [schema_name],
        [table_name],
-       [drop_tsql],
-       [create_tsql],
+       [Drop_Tsql],
+       [Create_Tsql],
        [include_column_names],
        [filter_definition],
        [is_unique_constraint],
@@ -431,14 +431,14 @@ SELECT [id],
        [key_column_names_with_sort_order],
        [schema_name],
        [table_name],
-       [drop_tsql],
-       [create_tsql],
+       [Drop_Tsql],
+       [Create_Tsql],
        [include_column_names],
        [filter_definition],
        [is_unique_constraint],
        [is_disabled],
        [is_hypothetical]
-FROM   cte2 WHERE row_num <> 1"
+FROM   CTE2 WHERE row_num <> 1"
 try {
   $Results = Invoke-Sqlcmd -ServerInstance $Server -Database $OutputDatbaseName -Query $Query -ErrorAction Stop
 }
@@ -487,8 +487,8 @@ $Query = "SELECT t1.[id],
                   t1.[index_name],
                   t1.[schema_name],
                   t1.[table_name],
-                  t1.[drop_tsql],
-                  t1.[create_tsql],
+                  t1.[Drop_Tsql],
+                  t1.[Create_Tsql],
                   t1.[is_unique_constraint],
                   t1.object_type
           FROM   [$OutputSchemaName].[$OutputTableName] t1 
