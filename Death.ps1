@@ -18,7 +18,7 @@
 #Connect to server $Server and check if the database $DbName exists
 #Get the version number of dbo.sp_BlitzIndex
 #Delete the ouput table if it exists
-#Execute sp_blitzindex and write output to $OutputDatbaseName
+#Execute sp_blitzindex and write output to $OutputDatabaseName
 #Write General info
 #Check if SQL is up and running longer than the number of days defined by $MinDaysUptime        
 #Get sp_BlitzIndex result from the output database (unused indexes)
@@ -37,6 +37,7 @@
 #==================================================================================================
 #Parameters
 #==================================================================================================
+<#
 Param(
     #Server where the database is located
     [Parameter(Mandatory = $True)] [string]$Server = $(Read-Host "Server name"),
@@ -47,12 +48,13 @@ Param(
     #location of the sp_BlitzIndex sp on server $Server
     [Parameter(Mandatory = $False)] [string]$Sp_BlitzIndex = 'master.dbo.sp_BlitzIndex',
     #database where the output will be written
-    [Parameter(Mandatory = $False)] [string]$OutputDatbaseName = $DbName,
-    #schema in database $OutputDatbaseName where the output will be written
+    [Parameter(Mandatory = $False)] [string]$OutputDatabaseName = $DbName,
+    #schema in database $OutputDatabaseName where the output will be written
     [Parameter(Mandatory = $False)] [string]$OutputSchemaName = 'dbo',
-    #table in database $OutputDatbaseName where the output will be written
+    #table in database $OutputDatabaseName where the output will be written
     [Parameter(Mandatory = $False)] [string]$OutputTableName   = ('BlitzIndex_' + $DbName)
 )
+#>
 #==================================================================================================
 #Function to check index options
 #==================================================================================================
@@ -143,33 +145,32 @@ Function Write-TsqlStatement ($Output, $Message){
 #==================================================================================================
 Function Remove-Records ($Filter){
   $Query = "DELETE FROM [$OutputSchemaName].[$OutputTableName] WHERE [id] IN ($Filter)"
-  Invoke-Sqlcmd -ServerInstance $Server -Database $OutputDatbaseName -Query $Query -ErrorAction Stop
+  Invoke-Sqlcmd -ServerInstance $Server -Database $OutputDatabaseName -Query $Query -ErrorAction Stop
 }
 #==================================================================================================
 #Start script
 #==================================================================================================
-#Remove-Variable -Name * -ErrorAction SilentlyContinue | Out-Null
 clear-host
 $StartDate = Get-Date
 #==================================================================================================
 #Run variables
 #==================================================================================================
-#$Server                = '' #Server with the database where sp_BlitzIndex should run
-#$DbName                = '' #database where sp_BlitzIndex should run
-#$MinDaysUptime         = 7 #Min nr of days that a server should be running when checking unused indexes
-#$Sp_BlitzIndex                   = 'master.dbo.sp_BlitzIndex'
+$Server                = '.' #Server with the database where sp_BlitzIndex should run
+$DbName                = 'StackoverFlow' #database where sp_BlitzIndex should run
+$MinDaysUptime         = 5 #Min nr of days that a server should be running when checking unused indexes
+$Sp_BlitzIndex         = 'master.dbo.sp_BlitzIndex'
 $ErrorActionPreference = 'Stop'
 #==================================================================================================
 #Output variables
 #==================================================================================================
-#$OutputDatbaseName = ''
-#$OutputSchemaName  = 'dbo'
-#$OutputTableName   = ('BlitzIndex_' + $DbName)
-$Output            = (New-Object System.Collections.ArrayList)
+$OutputDatabaseName = 'master'
+$OutputSchemaName   = 'dbo'
+$OutputTableName    = ('BlitzIndex_' + $DbName)
+$Output             = (New-Object System.Collections.ArrayList)
 #==================================================================================================
 #Check if the SqlServer powershell module is installed
 #==================================================================================================
-try {
+try{
   Import-Module -Name SqlServer -ErrorAction Stop
   $Result = ((Get-Module -Name SqlServer -ErrorAction Stop).ExportedCommands).Keys | Where-Object {$PSItem -eq 'Invoke-Sqlcmd'}
   if($null -eq $Result) {
@@ -178,7 +179,7 @@ try {
     Exit
   }
 }
-catch {
+catch{
   Throw
 }
 #==================================================================================================
@@ -215,14 +216,14 @@ try{
     }
   }
 }
-catch {
+catch{
   Throw
 }
 #==================================================================================================
 #Connect to server $Server and check if the database $DbName exists
 #==================================================================================================
 $Query  = "SELECT [name] FROM [sys].[databases] WHERE [name] = '$DbName'"
-try {
+try{
   $Result = (Invoke-Sqlcmd -ServerInstance $Server -Database master -Query $Query -ErrorAction Stop).name
   if($Result -ne $DbName){
     Write-Output "Database '$DbName' isn't found on SQL server '$Server'"
@@ -237,7 +238,7 @@ catch{
 #==================================================================================================
 #@Mode = 1 => Summarize
 $Query  = "$Sp_BlitzIndex @DatabaseName = 'model', @Mode =1"
-try {
+try{
   $Version = (Invoke-Sqlcmd -ServerInstance $Server -Database master -Query $Query -ErrorAction Stop)[1]
 }
 catch{
@@ -252,22 +253,22 @@ $Query = "IF EXISTS
              WHERE t.[name] = '$OutputTableName' AND s.[name] = '$OutputSchemaName')
           DROP TABLE [$OutputSchemaName].[$OutputTableName]"
 
-try {
-  Invoke-Sqlcmd -ServerInstance $Server -Database $OutputDatbaseName -Query $Query -ErrorAction Stop
+try{
+  Invoke-Sqlcmd -ServerInstance $Server -Database $OutputDatabaseName -Query $Query -ErrorAction Stop
 }
 catch{
   Throw
 }
 #==================================================================================================
-#Execute sp_blitzindex and write output to $OutputDatbaseName
+#Execute sp_blitzindex and write output to $OutputDatabaseName
 #==================================================================================================
-$Query = "$Sp_BlitzIndex @DatabaseName = '$DbName', @Mode = 2, @OutputDatabaseName = '$OutputDatbaseName',
+$Query = "$Sp_BlitzIndex @DatabaseName = '$DbName', @Mode = 2, @OutputDatabaseName = '$OutputDatabaseName',
            @OutputTableName = '$OutputTableName', @OutputSchemaName = '$OutputSchemaName'"
 
-try {
+try{
   Invoke-Sqlcmd -ServerInstance $Server -Database master -Query $Query -ErrorAction Stop -ApplicationIntent ReadOnly
 }
-catch {
+catch{
   Throw
 }
 #==================================================================================================
@@ -295,9 +296,9 @@ Write-Output $Text
 #==================================================================================================
 #Check if SQL is up and running longer than the number of days defined by $MinDaysUptime
 #==================================================================================================
-$Query = "SELECT DATEDIFF(dd,sqlserver_start_time,GETDATE())  AS  [DaysUp] from sys.dm_os_sys_info"
+$Query = "SELECT DATEDIFF(dd,sqlserver_start_time,GETDATE()) AS [DaysUp] from sys.dm_os_sys_info"
 
-try {
+try{
   $DaysUp = (Invoke-Sqlcmd -ServerInstance $Server -Database master -Query $Query -ErrorAction Stop).DaysUp
   if($DaysUp -lt $MinDaysUptime){
     $BoolDaysUp = $false
@@ -334,8 +335,8 @@ if($BoolDaysUp -eq $true){
                 [index_definition] NOT LIKE '\[UNIQUE\]%' {escape '\'} AND
                 [is_primary_key] = 0 AND
                 DATEDIFF(dd, modify_date,run_datetime) > $MinDaysUptime"
-  try {
-    $Results = Invoke-Sqlcmd -ServerInstance $Server -Database $OutputDatbaseName -Query $Query -ErrorAction Stop
+  try{
+    $Results = Invoke-Sqlcmd -ServerInstance $Server -Database $OutputDatabaseName -Query $Query -ErrorAction Stop
     $Results = $Results | Sort-Object -Property 'Schema_Name', 'Object_Name', 'Index_Name'
   }
   catch{
@@ -373,74 +374,74 @@ if($Filter.count -gt 0){
 #Get sp_BlitzIndex from the database (duplicate indexes)
 #==================================================================================================
 $Query = "
-WITH cte
+WITH cte
 /*Get a distinct list of duplicate indexes */
-     AS (SELECT DISTINCT t1.[id],
-                         t1.[key_column_names_with_sort_order],
-                         t1.[schema_name],
-                         t1.[table_name],
-                         t1.[Drop_Tsql],
-                         t1.[Create_Tsql],
-                         t1.[include_column_names],
-                         t1.[filter_definition],
-                         t1.[is_unique_constraint],
-                         t1.[is_disabled],
-                         t1.[is_hypothetical]
-         FROM   [$OutputSchemaName].[$OutputTableName] t1 INNER JOIN
+     AS (SELECT DISTINCT t1.[id],
+          t1.[key_column_names_with_sort_order],
+          t1.[schema_name],
+          t1.[table_name],
+          t1.[Drop_Tsql],
+          t1.[Create_Tsql],
+          t1.[include_column_names],
+          t1.[filter_definition],
+          t1.[is_unique_constraint],
+          t1.[is_disabled],
+          t1.[is_hypothetical]
+         FROM   [$OutputSchemaName].[$OutputTableName] t1 INNER JOIN
                 [$OutputSchemaName].[$OutputTableName] t2  
-                ON t1.[table_name] = t2.[table_name]
-                AND t1.[schema_name] = t2.[schema_name]
-                AND t1.id <> t2.id
-         WHERE  t1.[schema_name] = t2.[schema_name]
-                AND t1.[table_name] = t2.[table_name]
-                AND t1.[filter_definition] = t2.[filter_definition]
-                AND t1.[is_unique_constraint] = t2.[is_unique_constraint]
-                AND t1.[is_disabled] = t2.[is_disabled]
-                AND t1.[is_hypothetical] = t2.[is_hypothetical]
-                AND t1.[include_column_names] = t2.[include_column_names]
-                AND t1.[key_column_names_with_sort_order] = t2.[key_column_names_with_sort_order]
-                AND t1.[is_primary_key] = t2.[is_primary_key]
-                --AND t1.object_type = 'NonClustered'
+ ON t1.[table_name] = t2.[table_name]
+ AND t1.[schema_name] = t2.[schema_name]
+ AND t1.id <> t2.id
+         WHERE  t1.[schema_name] = t2.[schema_name]
+ AND t1.[table_name] = t2.[table_name]
+ AND t1.[filter_definition] = t2.[filter_definition]
+ AND t1.[is_unique_constraint] = t2.[is_unique_constraint]
+ AND t1.[is_disabled] = t2.[is_disabled]
+ AND t1.[is_hypothetical] = t2.[is_hypothetical]
+ AND t1.[include_column_names] = t2.[include_column_names]
+ AND t1.[key_column_names_with_sort_order] = t2.[key_column_names_with_sort_order]
+                AND t1.[is_primary_key] = t2.[is_primary_key]
+ --AND t1.object_type = 'NonClustered'
 )
 /*Add a row number */
 ,CTE2 AS
 (
-SELECT [id],
-       [key_column_names_with_sort_order],
-       [schema_name],
-       [table_name],
-       [Drop_Tsql],
-       [Create_Tsql],
-       [include_column_names],
-       [filter_definition],
-       [is_unique_constraint],
-       [is_disabled],
-       [is_hypothetical],
-        Row_number()
-              OVER (
-              partition BY [schema_name], [table_name],
-              [filter_definition],
-              [is_unique_constraint], [is_disabled],
-              [include_column_names],
-              [is_hypothetical],
-              [key_column_names_with_sort_order]
-              ORDER BY id DESC ) row_num
-FROM   cte)
+SELECT [id],
+       [key_column_names_with_sort_order],
+       [schema_name],
+       [table_name],
+       [Drop_Tsql],
+       [Create_Tsql],
+       [include_column_names],
+       [filter_definition],
+       [is_unique_constraint],
+       [is_disabled],
+       [is_hypothetical],
+        Row_number()
+              OVER (
+              partition BY [schema_name], [table_name],
+              [filter_definition],
+              [is_unique_constraint], [is_disabled],
+              [include_column_names],
+              [is_hypothetical],
+              [key_column_names_with_sort_order]
+              ORDER BY id DESC ) row_num
+FROM   cte)
 /*Get all the indexes with row_num <> 1, these should be deleted */
-SELECT [id],
-       [key_column_names_with_sort_order],
-       [schema_name],
-       [table_name],
-       [Drop_Tsql],
-       [Create_Tsql],
-       [include_column_names],
-       [filter_definition],
-       [is_unique_constraint],
-       [is_disabled],
-       [is_hypothetical]
-FROM   CTE2 WHERE row_num <> 1"
-try {
-  $Results = Invoke-Sqlcmd -ServerInstance $Server -Database $OutputDatbaseName -Query $Query -ErrorAction Stop
+SELECT [id],
+       [key_column_names_with_sort_order],
+       [schema_name],
+       [table_name],
+       [Drop_Tsql],
+       [Create_Tsql],
+       [include_column_names],
+       [filter_definition],
+       [is_unique_constraint],
+       [is_disabled],
+       [is_hypothetical]
+FROM   CTE2 WHERE row_num <> 1"
+try{
+  $Results = Invoke-Sqlcmd -ServerInstance $Server -Database $OutputDatabaseName -Query $Query -ErrorAction Stop
 }
 catch{
   Throw
@@ -474,8 +475,8 @@ if($Filter.count -gt 0){
 #Get sp_BlitzIndex from the database (duplicate sort columns without include)
 #==================================================================================================
 #Get nonclustered indexes where there's more then 1 index on a table
-$Query = "SELECT t1.[id],
-                  t1.[key_column_names_with_sort_order],
+$Query = "SELECT t1.[id],
+                  t1.[key_column_names_with_sort_order],
 	                /*Below line is to concatenate the inlcude_column_names and secret colum, the secret column starts with '[1 KEY]' and must be removed with the substring expression
 					        If there are no included columns, just select the secret column*/
 					        CASE t1.include_column_names 
@@ -484,23 +485,25 @@ $Query = "SELECT t1.[id],
 					         ELSE
 					          (CONCAT(t1.[include_column_names],',',(Substring ((t1.[secret_columns]), ((CHARINDEX(']',t1.[secret_columns],0)) + 1), (LEN(t1.[secret_columns])))))) 
 					        END AS [include_column_names], 
-                  t1.[index_name],
-                  t1.[schema_name],
-                  t1.[table_name],
-                  t1.[Drop_Tsql],
-                  t1.[Create_Tsql],
+                  t1.[index_name],
+                  t1.[schema_name],
+                  t1.[table_name],
+                  t1.[Drop_Tsql],
+                  t1.[Create_Tsql],
                   t1.[is_unique_constraint],
-                  t1.object_type
-          FROM   [$OutputSchemaName].[$OutputTableName] t1 
-          WHERE  (SELECT Count(*)
-                  FROM   [$OutputSchemaName].[$OutputTableName] t2
-                  WHERE  t2.object_type = 'NonClustered'
-                          AND t1.[schema_name] = t2.[schema_name]
-                          AND t1.[table_name] = t2.[table_name]
-                  GROUP  BY table_name) > 1
-                  AND t1.object_type = 'NonClustered'"
-try {
-  $Results = Invoke-Sqlcmd -ServerInstance $Server -Database $OutputDatbaseName -Query $Query -OutputAs DataTables -ErrorAction Stop
+                  t1.object_type
+          FROM   [$OutputSchemaName].[$OutputTableName] t1 
+          WHERE  (SELECT Count(*)
+                  FROM   
+                    [$OutputSchemaName].[$OutputTableName] t2
+                  WHERE  
+                    t2.object_type = 'NonClustered'
+                    AND t1.[schema_name] = t2.[schema_name]
+                    AND t1.[table_name] = t2.[table_name]
+                  GROUP  BY table_name) > 1
+            AND t1.object_type = 'NonClustered'"
+try{
+  $Results = Invoke-Sqlcmd -ServerInstance $Server -Database $OutputDatabaseName -Query $Query -OutputAs DataTables -ErrorAction Stop
 }
 catch{
   Throw
@@ -544,8 +547,8 @@ $Query = "IF EXISTS
 	          (SELECT * FROM sys.tables t  INNER JOIN sys.schemas s ON 
 	          t.[schema_id] = s.[schema_id] WHERE t.[name] = '$OutputTableName' AND s.[name] = '$OutputSchemaName')
           DROP TABLE [$OutputSchemaName].[$OutputTableName]"
-try {
-  Invoke-Sqlcmd -ServerInstance $Server -Database $OutputDatbaseName -Query $Query -ErrorAction Stop
+try{
+  Invoke-Sqlcmd -ServerInstance $Server -Database $OutputDatabaseName -Query $Query -ErrorAction Stop
 }
 catch{
   Throw
